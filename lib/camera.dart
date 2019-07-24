@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:tflite/tflite.dart';
 import 'dart:math' as math;
-
-import 'models.dart';
+const String ssd = "SSD MobileNet";
+const String yolo = "Tiny YOLOv2";
 
 typedef void Callback(List<dynamic> list, int h, int w);
 
@@ -31,7 +31,7 @@ class _CameraState extends State<Camera> {
     } else {
       controller = new CameraController(
         widget.cameras[0],
-        ResolutionPreset.medium,
+        ResolutionPreset.high,
       );
       controller.initialize().then((_) {
         if (!mounted) {
@@ -45,59 +45,28 @@ class _CameraState extends State<Camera> {
 
             int startTime = new DateTime.now().millisecondsSinceEpoch;
 
-            if (widget.model == mobilenet) {
-              Tflite.runModelOnFrame(
-                bytesList: img.planes.map((plane) {
-                  return plane.bytes;
-                }).toList(),
-                imageHeight: img.height,
-                imageWidth: img.width,
-                numResults: 2,
-              ).then((recognitions) {
-                int endTime = new DateTime.now().millisecondsSinceEpoch;
-                print("Detection took ${endTime - startTime}");
+            Tflite.detectObjectOnFrame(
+              bytesList: img.planes.map((plane) {
+                return plane.bytes;
+              }).toList(),
+              model: widget.model == yolo ? "YOLO" : "SSDMobileNet",
+              imageHeight: img.height,
+              imageWidth: img.width,
+              imageMean: widget.model == yolo ? 0 : 127.5,
+              imageStd: widget.model == yolo ? 255.0 : 127.5,
+              numResultsPerClass: 12,
+              threshold: widget.model == yolo ? 0.2 : 0.4,
+            ).then((recognitions) {
+              // print(recognitions);
 
-                widget.setRecognitions(recognitions, img.height, img.width);
+              int endTime = new DateTime.now().millisecondsSinceEpoch;
+//              print("Detection took ${endTime - startTime}");
+//              print(recognitions);
 
-                isDetecting = false;
-              });
-            } else if (widget.model == posenet) {
-              Tflite.runPoseNetOnFrame(
-                bytesList: img.planes.map((plane) {
-                  return plane.bytes;
-                }).toList(),
-                imageHeight: img.height,
-                imageWidth: img.width,
-                numResults: 2,
-              ).then((recognitions) {
-                int endTime = new DateTime.now().millisecondsSinceEpoch;
-                print("Detection took ${endTime - startTime}");
+              widget.setRecognitions(recognitions, img.height, img.width);
 
-                widget.setRecognitions(recognitions, img.height, img.width);
-
-                isDetecting = false;
-              });
-            } else {
-              Tflite.detectObjectOnFrame(
-                bytesList: img.planes.map((plane) {
-                  return plane.bytes;
-                }).toList(),
-                model: widget.model == yolo ? "YOLO" : "SSDMobileNet",
-                imageHeight: img.height,
-                imageWidth: img.width,
-                imageMean: widget.model == yolo ? 0 : 127.5,
-                imageStd: widget.model == yolo ? 255.0 : 127.5,
-                numResultsPerClass: 1,
-                threshold: widget.model == yolo ? 0.2 : 0.4,
-              ).then((recognitions) {
-                int endTime = new DateTime.now().millisecondsSinceEpoch;
-                print("Detection took ${endTime - startTime}");
-
-                widget.setRecognitions(recognitions, img.height, img.width);
-
-                isDetecting = false;
-              });
-            }
+              isDetecting = false;
+            });
           }
         });
       });
